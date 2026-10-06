@@ -108,6 +108,14 @@ td.c,th.c{text-align:center}
 .f input[readonly]{background:var(--hover);color:var(--muted)}
 .x{all:unset;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:4px;border-radius:6px}
 .x:hover{background:var(--hover)}
+.lrow{display:flex;align-items:center;gap:6px;position:relative}
+.info{all:unset;cursor:help;width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font:600 10.5px/1 var(--sans);color:var(--muted);border:1px solid var(--line);box-sizing:border-box}
+.info:hover,.info:focus-visible{color:var(--ink);border-color:var(--muted)}
+.info:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tip{position:absolute;left:0;top:calc(100% + 8px);z-index:5;width:min(340px,calc(100vw - 48px));background:var(--ink);color:var(--bg);border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.5;font-weight:400;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;flex-direction:column;gap:8px}
+.tip q{display:block;quotes:"\201C" "\201D";font-style:italic;opacity:.92;border-left:2px solid currentColor;padding-left:9px}
+.tip .src{font:500 11px/1.3 var(--mono);opacity:.65}
+.lrow:hover .tip,.info:focus + .tip,.info[aria-expanded="true"] + .tip{display:flex}
 
 .empty{padding:48px 20px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
 .empty p{margin:0;color:var(--muted)}
@@ -314,17 +322,33 @@ function answer(i){
   S.thread.push({html, srcs});
 }
 
+function lab(id,text,tid){
+  const t = TIPS[tid];
+  return `<div class="lrow"><label for="${id}">${text}</label><button type="button" class="info" aria-label="Why ${text}?" aria-describedby="tip-${tid}" aria-expanded="false" data-tip="${tid}">i</button><div class="tip" role="tooltip" id="tip-${tid}"><span>${t.why}</span><q>${t.q}</q><span class="src">${t.src}</span></div></div>`;
+}
+const TIPS = {
+  name:{why:'Each client organisation is its own tenant, so its users and the assistant only ever see that organisation’s records.',
+    q:'As a platform administrator, I can create a tenant, roles and data-access policies so every user and agent sees only authorised records.', src:'Product brief · E1, US01'},
+  id:{why:'A permanent ID is stamped on every record, so ownership and access can always be traced back to this tenant.',
+    q:'All nodes carry stable ID, source, effective date, confidence, owner, tenant and access policy.', src:'Product brief · §7 Canonical organisational ontology'},
+  region:{why:'Clients decide where their data is stored. Many cannot let it leave their country.',
+    q:'Deployable data residency and model-routing controls; no unauthorised cross-border transfer; classified data policies enforced per customer context.', src:'Product brief · §17 Sovereignty'},
+  models:{why:'The same residency rules apply to AI. The tenant decides which models may process its data.',
+    q:'Deployable data residency and model-routing controls; no unauthorised cross-border transfer; classified data policies enforced per customer context.', src:'Product brief · §17 Sovereignty'},
+  hier:{why:'Access rules and plans are scoped to positions in this hierarchy, so it has to be set up first.',
+    q:'BU exists in hierarchy, has owner, remit and parent relationship.', src:'Product brief · §8 Minimum viable knowledge graph maturity'}
+};
 function drawer(){
   if(!S.drawer){ $('#layer').innerHTML=''; return; }
   const t = S.tenant;
   $('#layer').innerHTML = `<div class="scrim" data-act="close"><div class="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle">
     <div class="dh"><h2 id="dtitle">New tenant</h2><button class="x" data-act="close" aria-label="Close">×</button></div>
     <div class="db">
-      <div class="f"><label for="f-name">Organisation name</label><input id="f-name" value="${esc(t.name)}"></div>
-      <div class="f"><label for="f-id">Tenant ID</label><input id="f-id" value="${esc(t.id)}" readonly></div>
-      <div class="f"><label for="f-region">Data region</label><select id="f-region">${['UAE','KSA','EU'].map(x=>`<option ${x===t.region?'selected':''}>${x}</option>`).join('')}</select></div>
-      <div class="f"><label for="f-models">AI models</label><select id="f-models">${['In-region only','Any approved'].map(x=>`<option ${x===t.models?'selected':''}>${x}</option>`).join('')}</select></div>
-      <div class="f"><label for="f-h">Hierarchy</label><input id="f-h" value="${esc(t.hierarchy)}"></div>
+      <div class="f">${lab('f-name','Organisation name','name')}<input id="f-name" value="${esc(t.name)}"></div>
+      <div class="f">${lab('f-id','Tenant ID','id')}<input id="f-id" value="${esc(t.id)}" readonly></div>
+      <div class="f">${lab('f-region','Data region','region')}<select id="f-region">${['UAE','KSA','EU'].map(x=>`<option ${x===t.region?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="f">${lab('f-models','AI models','models')}<select id="f-models">${['In-region only','Any approved'].map(x=>`<option ${x===t.models?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="f">${lab('f-h','Hierarchy','hier')}<input id="f-h" value="${esc(t.hierarchy)}"></div>
     </div>
     <div class="df"><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="create">Create tenant</button></div>
   </div></div>`;
@@ -337,6 +361,7 @@ function render(){ ws(); nav(); $('#main').innerHTML = VIEW[S.page](); drawer();
 document.addEventListener('click', e=>{
   const b = e.target.closest('button,[data-act]'); if(!b) return;
   if(b.classList.contains('scrim') && e.target!==b) return;
+  if(b.dataset.tip){ const open=b.getAttribute('aria-expanded')==='true'; document.querySelectorAll('.info[aria-expanded="true"]').forEach(x=>x.setAttribute('aria-expanded','false')); b.setAttribute('aria-expanded', open?'false':'true'); return; }
   const a = b.dataset.act;
   if(b.dataset.page){ if(!b.disabled){ S.page=b.dataset.page; render(); } return; }
   if(a==='new'){ S.drawer=true; drawer(); return; }
